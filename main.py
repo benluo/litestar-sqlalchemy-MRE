@@ -1,36 +1,36 @@
+from typing import Optional
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
 )  # AsyncSession
-from litestar.contrib.sqlalchemy.plugins.init import SQLAlchemyAsyncConfig
-import uvicorn
-from typing import Optional
 from datetime import datetime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
-
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import MappedAsDataclass
-import pydantic
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 # from sqlalchemy.engine import result
+from litestar import Litestar, Router
 from litestar import get, post, delete  # put
 from litestar.controller import Controller
 from litestar.contrib.sqlalchemy.plugins.init import SQLAlchemyInitPlugin
-from litestar import Litestar, Router
+from litestar.contrib.sqlalchemy.base import Base as LiteBase
+from litestar.contrib.sqlalchemy.plugins.init import SQLAlchemyAsyncConfig
 
-# from litestar.contrib.sqlalchemy.base import Base as LiteBase
+from litestar.partial import Partial
 
-# from litestar.partial import Partial
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+import uvicorn
+import pydantic
+from uuid import UUID
 
 
 class Base(
     MappedAsDataclass,
-    # LiteBase
-    DeclarativeBase,
+    LiteBase,
+    #     # DeclarativeBase,
     dataclass_callable=pydantic.dataclasses.dataclass,
 ):
     pass
@@ -40,13 +40,14 @@ class User(Base):
     """User who can use the"""
 
     __tablename__ = "users"
+    __table_args__ = {"extend_existing": True}
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True, init=False
-    )  # , autoincrement=True)
+    # id: Mapped[int] = mapped_column(
+    #     primary_key=True, init=False
+    # )  # , autoincrement=True)
     username: Mapped[str]
     password: Mapped[str]
-    created_at: Mapped[datetime] = mapped_column(insert_default=func.now(), init=False)
+    # created_at: Mapped[datetime] = mapped_column(insert_default=func.now(), init=False)
 
     def __repr__(self) -> str:
         """
@@ -67,7 +68,7 @@ async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 class UserController(Controller):
     path = "/users"
-    DETAIL_ROUTE = "/{id:int}"
+    DETAIL_ROUTE = "/{id:uuid}"
 
     async def get_item(self, id: int) -> Optional[User]:
         """Get Item by ID."""
@@ -81,11 +82,13 @@ class UserController(Controller):
         # async_session = async_sessionmaker(database.engine, expire_on_commit=False)
         # rr = []
         async with async_session() as session:
-            results = await session.scalars(select(User))
-            return [r for r in results]
+            _results = await session.scalars(select(User))
+            result = [r for r in _results]
+            print(result)
+            return result
 
     @post()
-    async def create_user(self, data: User) -> None:
+    async def create_user(self, data: Partial[User]) -> None:
         """Create a `User`."""
         print(data)
         async with async_session() as session:
